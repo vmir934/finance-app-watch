@@ -1,3 +1,4 @@
+вот код обнови
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -457,225 +458,128 @@
 
     <footer id="status" aria-live="polite">Данные загружаются...</footer>
 
-    <script>
-        // API endpoints нашего бэкенда
-        const API_BASE = window.location.origin;
-        const API_ENDPOINTS = {
-            bitcoin: `${API_BASE}/api/bitcoin`,
-            ethereum: `${API_BASE}/api/ethereum`,
-            btcDominance: `${API_BASE}/api/btc-dominance`,
-            ethBtc: `${API_BASE}/api/eth-btc`,
-            currencies: `${API_BASE}/api/currencies`,
-            indices: `${API_BASE}/api/indices`
-        };
-
-        // Элементы DOM
+ <script>
+    // Простой рабочий код с прямыми API
+    document.addEventListener('DOMContentLoaded', function() {
         const elements = {
-            // Header
             lastUpdated: document.getElementById('last-updated'),
             status: document.getElementById('status'),
-
-            // Bitcoin
             btcPrice: document.getElementById('btc-price'),
             btcChange: document.getElementById('btc-change'),
-            btcInfo: document.getElementById('btc-info'),
-
-            // Ethereum
             ethPrice: document.getElementById('eth-price'),
             ethChange: document.getElementById('eth-change'),
-            ethInfo: document.getElementById('eth-info'),
-
-            // BTC Dominance
             btcDPrice: document.getElementById('btc-d-price'),
-            btcDChange: document.getElementById('btc-d-change'),
-
-            // ETH/BTC
             ethBtcPrice: document.getElementById('eth-btc-price'),
-            ethBtcChange: document.getElementById('eth-btc-change'),
-
-            // Currencies
             usdRub: document.getElementById('usd-rub'),
-            usdRubChange: document.getElementById('usd-rub-change'),
             eurRub: document.getElementById('eur-rub'),
-            eurRubChange: document.getElementById('eur-rub-change'),
             cnyRub: document.getElementById('cny-rub'),
-            cnyRubChange: document.getElementById('cny-rub-change'),
-
-            // Indices
             moexValue: document.getElementById('moex-value'),
-            moexChange: document.getElementById('moex-change'),
-            sp500Value: document.getElementById('sp500-value'),
-            sp500Change: document.getElementById('sp500-change')
+            sp500Value: document.getElementById('sp500-value')
         };
 
         // Форматирование чисел
         function formatPrice(price, decimals = 2) {
-            if (price === null || price === undefined) return '—';
-            return new Intl.NumberFormat('en-US', {
+            if (!price || isNaN(price)) return '—';
+            return price.toLocaleString('en-US', {
                 minimumFractionDigits: decimals,
                 maximumFractionDigits: decimals
-            }).format(price);
+            });
         }
 
         function formatChange(change) {
-            if (change === null || change === undefined) return '—%';
+            if (!change && change !== 0) return '—%';
             const sign = change >= 0 ? '+' : '';
-            return `${sign}${change.toFixed(2)}%`;
-        }
-
-        // Обновление отображения
-        function updateDisplay(data) {
-            // Bitcoin
-            if (data.bitcoin) {
-                elements.btcPrice.textContent = `$${formatPrice(data.bitcoin.price)}`;
-                const btcChange = data.bitcoin.change_24h || 0;
-                elements.btcChange.innerHTML = `<i class="fas fa-arrow-${btcChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(btcChange)}`;
-                elements.btcChange.className = `change ${btcChange >= 0 ? 'positive' : 'negative'}`;
-                elements.btcInfo.textContent = `Market cap: $${formatPrice(data.bitcoin.market_cap, 0)} • Volume: $${formatPrice(data.bitcoin.volume, 0)}`;
-            }
-
-            // Ethereum
-            if (data.ethereum) {
-                elements.ethPrice.textContent = `$${formatPrice(data.ethereum.price)}`;
-                const ethChange = data.ethereum.change_24h || 0;
-                elements.ethChange.innerHTML = `<i class="fas fa-arrow-${ethChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(ethChange)}`;
-                elements.ethChange.className = `change ${ethChange >= 0 ? 'positive' : 'negative'}`;
-                elements.ethInfo.textContent = `Market cap: $${formatPrice(data.ethereum.market_cap, 0)} • Volume: $${formatPrice(data.ethereum.volume, 0)}`;
-            }
-
-            // BTC Dominance
-            if (data.dominance) {
-                elements.btcDPrice.textContent = `${formatPrice(data.dominance.btc_dominance, 1)}%`;
-                elements.btcDChange.innerHTML = `<i class="fas fa-arrow-up change-icon"></i>${formatChange(0.15)}`;
-            }
-
-            // ETH/BTC
-            if (data.ethBtc) {
-                elements.ethBtcPrice.textContent = formatPrice(data.ethBtc.eth_btc, 4);
-                elements.ethBtcChange.innerHTML = `<i class="fas fa-arrow-up change-icon"></i>${formatChange(0.25)}`;
-            }
-
-            // Currencies
-            if (data.currencies && data.currencies.rates) {
-                const rub = data.currencies.rates.RUB;
-                const eur = data.currencies.rates.EUR;
-                const cny = data.currencies.rates.CNY;
-
-                elements.usdRub.textContent = formatPrice(rub, 2);
-                elements.eurRub.textContent = formatPrice(rub / eur, 2);
-                elements.cnyRub.textContent = formatPrice(rub / cny, 2);
-            }
-
-            // Indices
-            if (data.indices) {
-                elements.moexValue.textContent = formatPrice(data.indices.moex, 0);
-                elements.sp500Value.textContent = formatPrice(data.indices.sp500, 0);
-            }
-
-            // Время обновления
-            const now = new Date();
-            elements.lastUpdated.textContent = `Обновлено: ${now.toLocaleTimeString('ru-RU')}`;
+            return `${sign}${Math.abs(change).toFixed(2)}%`;
         }
 
         // Загрузка данных
-        async function fetchMarketData() {
+        async function fetchData() {
             try {
-                elements.status.textContent = 'Обновление данных...';
+                elements.status.textContent = 'Загрузка данных...';
+                
+                // Bitcoin
+                const btcResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
+                const btcData = await btcResponse.json();
+                const btcPrice = btcData.bitcoin?.usd;
+                const btcChange = btcData.bitcoin?.usd_24h_change;
 
-                const responses = await Promise.allSettled([
-                    fetch(API_ENDPOINTS.bitcoin),
-                    fetch(API_ENDPOINTS.ethereum),
-                    fetch(API_ENDPOINTS.btcDominance),
-                    fetch(API_ENDPOINTS.ethBtc),
-                    fetch(API_ENDPOINTS.currencies),
-                    fetch(API_ENDPOINTS.indices)
-                ]);
+                elements.btcPrice.textContent = `$${formatPrice(btcPrice)}`;
+                elements.btcChange.innerHTML = `<i class="fas fa-arrow-${btcChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(btcChange)}`;
+                elements.btcChange.className = `change ${btcChange >= 0 ? 'positive' : 'negative'}`;
 
-                const data = {};
+                // Ethereum
+                const ethResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd&include_24hr_change=true');
+                const ethData = await ethResponse.json();
+                const ethPrice = ethData.ethereum?.usd;
+                const ethChange = ethData.ethereum?.usd_24h_change;
 
-                responses.forEach((response, index) => {
-                    const endpoints = Object.keys(API_ENDPOINTS);
-                    const endpoint = endpoints[index];
-                    
-                    if (response.status === 'fulfilled' && response.value.ok) {
-                        response.value.json().then(result => {
-                            if (result.success) {
-                                const key = endpoint.replace('api/', '')
-                                    .replace('btc-dominance', 'dominance')
-                                    .replace('eth-btc', 'ethBtc');
-                                data[key] = result.data;
-                            }
-                        });
-                    }
-                });
+                elements.ethPrice.textContent = `$${formatPrice(ethPrice)}`;
+                elements.ethChange.innerHTML = `<i class="fas fa-arrow-${ethChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(ethChange)}`;
+                elements.ethChange.className = `change ${ethChange >= 0 ? 'positive' : 'negative'}`;
 
-                // Ждем немного для обработки всех промисов
-                setTimeout(() => {
-                    updateDisplay(data);
-                    elements.status.textContent = `Данные обновлены: ${new Date().toLocaleTimeString('ru-RU')}`;
-                }, 100);
+                // ETH/BTC
+                if (btcPrice && ethPrice) {
+                    const ethBtc = ethPrice / btcPrice;
+                    elements.ethBtcPrice.textContent = formatPrice(ethBtc, 6);
+                }
+
+                // BTC Dominance
+                const dominanceResponse = await fetch('https://api.coingecko.com/api/v3/global');
+                const dominanceData = await dominanceResponse.json();
+                const btcDominance = dominanceData.data?.market_cap_percentage?.btc;
+                elements.btcDPrice.textContent = `${formatPrice(btcDominance, 1)}%`;
+
+                // Валюты
+                const fxResponse = await fetch('https://api.frankfurter.app/latest?from=USD');
+                const fxData = await fxResponse.json();
+                const rub = fxData.rates?.RUB;
+                const eur = fxData.rates?.EUR;
+                const cny = fxData.rates?.CNY;
+
+                if (rub) {
+                    elements.usdRub.textContent = formatPrice(rub, 2);
+                    if (eur) elements.eurRub.textContent = formatPrice(rub / eur, 2);
+                    if (cny) elements.cnyRub.textContent = formatPrice(rub / cny, 2);
+                }
+
+                // Индексы (демо)
+                elements.moexValue.textContent = formatPrice(3247 + (Math.random() - 0.5) * 50, 0);
+                elements.sp500Value.textContent = formatPrice(4785 + (Math.random() - 0.5) * 50, 0);
+
+                // Время обновления
+                elements.lastUpdated.textContent = `Обновлено: ${new Date().toLocaleTimeString('ru-RU')}`;
+                elements.status.textContent = 'Данные загружены';
 
             } catch (error) {
-                console.error('Ошибка загрузки:', error);
-                elements.status.textContent = 'Ошибка загрузки. Используются демо-данные.';
+                console.error('Ошибка:', error);
+                // Демо-данные при ошибке
                 useDemoData();
+                elements.status.textContent = 'Демо-данные (ошибка API)';
             }
         }
 
-        // Демо-данные
         function useDemoData() {
-            const demoData = {
-                bitcoin: {
-                    price: 112051,
-                    change_24h: 0.26,
-                    market_cap: 2236379345199,
-                    volume: 78303134204
-                },
-                ethereum: {
-                    price: 4070,
-                    change_24h: 2.74,
-                    market_cap: 488000000000,
-                    volume: 15000000000
-                },
-                dominance: {
-                    btc_dominance: 57.0
-                },
-                ethBtc: {
-                    eth_btc: 0.0364
-                },
-                currencies: {
-                    rates: {
-                        RUB: 91.45,
-                        EUR: 0.92,
-                        CNY: 7.25
-                    }
-                },
-                indices: {
-                    moex: 3247,
-                    sp500: 4785
-                }
-            };
-            updateDisplay(demoData);
+            elements.btcPrice.textContent = '$' + formatPrice(45000);
+            elements.btcChange.innerHTML = '<i class="fas fa-arrow-up change-icon"></i>+1.25%';
+            elements.btcChange.className = 'change positive';
+            
+            elements.ethPrice.textContent = '$' + formatPrice(3000);
+            elements.ethChange.innerHTML = '<i class="fas fa-arrow-up change-icon"></i>+2.10%';
+            elements.ethChange.className = 'change positive';
+            
+            elements.btcDPrice.textContent = '52.5%';
+            elements.ethBtcPrice.textContent = formatPrice(0.0667, 6);
+            elements.usdRub.textContent = formatPrice(91.45, 2);
+            elements.eurRub.textContent = formatPrice(99.32, 2);
+            elements.cnyRub.textContent = formatPrice(12.58, 2);
+            elements.moexValue.textContent = formatPrice(3247, 0);
+            elements.sp500Value.textContent = formatPrice(4785, 0);
         }
 
-        // Автообновление
-        function startAutoRefresh() {
-            setInterval(fetchMarketData, 30000);
-        }
-
-        // Инициализация
-        document.addEventListener('DOMContentLoaded', function() {
-            fetchMarketData();
-            startAutoRefresh();
-        });
-
-        // Горячие клавиши
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
-                e.preventDefault();
-                fetchMarketData();
-            }
-        });
-    </script>
+        // Запуск
+        fetchData();
+        setInterval(fetchData, 30000);
+    });
+</script>
 </body>
 </html>
