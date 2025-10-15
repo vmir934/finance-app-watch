@@ -517,7 +517,7 @@
                 const [btcData, ethData, fxData] = await Promise.all([
                     safeFetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT'),
                     safeFetch('https://api.binance.com/api/v3/ticker/24hr?symbol=ETHUSDT'),
-                    safeFetch('https://api.exchangerate.host/latest?base=USD&symbols=RUB,EUR,CNY')
+                    safeFetch('https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=rub,eur,cny')
                 ]);
 
                 let hasRealData = false;
