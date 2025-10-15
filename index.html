@@ -1,681 +1,173 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finance Watch — Live</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --bg: #f7f8fb;
-            --card: #ffffff;
-            --muted: #6b7280;
-            --accent: #007aff;
-            --positive: #16a34a;
-            --negative: #ef4444;
-            --glass: rgba(255, 255, 255, 0.6);
-            --radius: 14px;
-        }
+<script>
+    // Прямые API endpoints (работают без бэкенда)
+    const API_ENDPOINTS = {
+        bitcoin: 'https://api.coingecko.com/api/v3/coins/bitcoin',
+        ethereum: 'https://api.coingecko.com/api/v3/coins/ethereum',
+        dominance: 'https://api.coingecko.com/api/v3/global',
+        currencies: 'https://api.frankfurter.app/latest?from=USD'
+    };
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+    // Элементы DOM
+    const elements = {
+        lastUpdated: document.getElementById('last-updated'),
+        status: document.getElementById('status'),
+        btcPrice: document.getElementById('btc-price'),
+        btcChange: document.getElementById('btc-change'),
+        btcInfo: document.getElementById('btc-info'),
+        ethPrice: document.getElementById('eth-price'),
+        ethChange: document.getElementById('eth-change'),
+        ethInfo: document.getElementById('eth-info'),
+        btcDPrice: document.getElementById('btc-d-price'),
+        ethBtcPrice: document.getElementById('eth-btc-price'),
+        usdRub: document.getElementById('usd-rub'),
+        eurRub: document.getElementById('eur-rub'),
+        cnyRub: document.getElementById('cny-rub'),
+        moexValue: document.getElementById('moex-value'),
+        sp500Value: document.getElementById('sp500-value')
+    };
 
-        html, body {
-            height: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
-            background: var(--bg);
-            color: #0b1220;
-            line-height: 1.5;
-        }
+    // Форматирование чисел
+    function formatPrice(price, decimals = 2) {
+        if (price === null || price === undefined || isNaN(price)) return '—';
+        return new Intl.NumberFormat('en-US', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        }).format(price);
+    }
 
-        /* Header */
-        header {
-            position: fixed;
-            left: 0;
-            right: 0;
-            top: 0;
-            height: 84px;
-            padding: 18px 20px;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.5));
-            backdrop-filter: blur(8px);
-            border-bottom: 1px solid rgba(15, 23, 42, 0.04);
-            display: flex;
-            align-items: center;
-            z-index: 40;
-        }
+    function formatChange(change) {
+        if (change === null || change === undefined || isNaN(change)) return '—%';
+        const sign = change >= 0 ? '+' : '';
+        return `${sign}${Math.abs(change).toFixed(2)}%`;
+    }
 
-        .header-content {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            width: 100%;
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
+    // Загрузка данных с прямых API
+    async function fetchMarketData() {
+        try {
+            elements.status.textContent = 'Обновление данных...';
+            
+            const [btcResponse, ethResponse, dominanceResponse, fxResponse] = await Promise.allSettled([
+                fetch(API_ENDPOINTS.bitcoin),
+                fetch(API_ENDPOINTS.ethereum),
+                fetch(API_ENDPOINTS.dominance),
+                fetch(API_ENDPOINTS.currencies)
+            ]);
 
-        .logo {
-            width: 52px;
-            height: 52px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #007aff, #4cc0ff);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 700;
-            box-shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
-        }
+            let btcData, ethData, dominanceData, fxData;
 
-        .brand {
-            flex: 1;
-        }
+            // Обработка Bitcoin
+            if (btcResponse.status === 'fulfilled' && btcResponse.value.ok) {
+                btcData = await btcResponse.value.json();
+                const btcPrice = btcData.market_data?.current_price?.usd;
+                const btcChange = btcData.market_data?.price_change_percentage_24h;
+                const btcMarketCap = btcData.market_data?.market_cap?.usd;
+                const btcVolume = btcData.market_data?.total_volume?.usd;
 
-        h1 {
-            font-size: 20px;
-            font-weight: 700;
-            margin: 0;
-        }
-
-        .subtitle {
-            font-size: 13px;
-            color: var(--muted);
-            margin-top: 2px;
-        }
-
-        .last-updated {
-            text-align: right;
-            font-size: 13px;
-            color: var(--muted);
-        }
-
-        /* Main Content */
-        .container {
-            max-width: 1100px;
-            margin: 110px auto 60px;
-            padding: 0 20px;
-        }
-
-        .section-title {
-            font-size: 16px;
-            color: var(--muted);
-            margin-bottom: 12px;
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-        }
-
-        .refresh-info {
-            font-size: 13px;
-            color: var(--muted);
-        }
-
-        /* Grid & Cards */
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 18px;
-            margin-bottom: 26px;
-        }
-
-        @media (max-width: 1000px) {
-            .grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 600px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
-            .container {
-                margin: 90px 14px 40px;
-            }
-        }
-
-        .card {
-            background: var(--card);
-            border-radius: var(--radius);
-            padding: 16px;
-            border: 1px solid rgba(2, 6, 23, 0.04);
-            box-shadow: 0 6px 18px rgba(12, 20, 34, 0.04);
-            transition: transform 0.14s, box-shadow 0.14s;
-        }
-
-        .card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 14px 36px rgba(12, 20, 34, 0.06);
-        }
-
-        .card:focus {
-            outline: 3px solid rgba(0, 122, 255, 0.12);
-        }
-
-        /* Card Content */
-        .card-header {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 18px;
-        }
-
-        .btc { background: linear-gradient(135deg, #f7931a, #ffb86b); }
-        .eth { background: linear-gradient(135deg, #627eea, #9aa8ff); }
-        .btc-d { background: #ff6b35; }
-        .eth-btc { background: linear-gradient(135deg, #f7931a, #627eea); }
-        .usd { background: linear-gradient(135deg, #16a34a, #7ee787); }
-        .eur { background: linear-gradient(135deg, #007aff, #5fb4ff); }
-        .cny { background: linear-gradient(135deg, #ff3b30, #ff6961); }
-        .moex { background: linear-gradient(135deg, #9333ea, #c292ff); }
-        .sp500 { background: linear-gradient(135deg, #5856d6, #8b8df2); }
-
-        .card-title {
-            font-weight: 700;
-            font-size: 15px;
-        }
-
-        .card-subtitle {
-            font-size: 12px;
-            color: var(--muted);
-        }
-
-        .price {
-            font-size: 22px;
-            font-weight: 800;
-            margin: 10px 0 8px;
-        }
-
-        .change {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 8px;
-            border-radius: 999px;
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .positive {
-            color: var(--positive);
-            background: rgba(22, 163, 74, 0.08);
-        }
-
-        .negative {
-            color: var(--negative);
-            background: rgba(239, 68, 68, 0.06);
-        }
-
-        .change-icon {
-            font-size: 12px;
-        }
-
-        .card-info {
-            font-size: 13px;
-            color: var(--muted);
-            margin-top: 8px;
-            line-height: 1.4;
-        }
-
-        /* Footer */
-        footer {
-            max-width: 1100px;
-            margin: 10px auto 30px;
-            padding: 0 20px;
-            color: var(--muted);
-            font-size: 13px;
-            text-align: center;
-        }
-
-        /* Loading states */
-        .loading {
-            opacity: 0.7;
-        }
-    </style>
-</head>
-<body>
-    <header>
-        <div class="header-content">
-            <div class="logo">FW</div>
-            <div class="brand">
-                <h1>Finance Watch</h1>
-                <div class="subtitle">Актуальные рыночные данные в реальном времени</div>
-            </div>
-            <div class="last-updated" id="last-updated">—</div>
-        </div>
-    </header>
-
-    <main class="container" role="main">
-        <!-- Криптовалюты -->
-        <section aria-labelledby="crypto-title">
-            <div class="section-title">
-                <h2 id="crypto-title">Криптовалюты</h2>
-                <div class="refresh-info">Обновляется каждые <strong>30 сек</strong></div>
-            </div>
-
-            <div class="grid">
-                <!-- Bitcoin -->
-                <article class="card" aria-labelledby="btc-title" tabindex="0">
-                    <div class="card-header">
-                        <div class="icon btc">
-                            <i class="fab fa-bitcoin"></i>
-                        </div>
-                        <div>
-                            <div class="card-title" id="btc-title">Bitcoin</div>
-                            <div class="card-subtitle">BTC / USD</div>
-                        </div>
-                    </div>
-                    <div class="price" id="btc-price">$—</div>
-                    <div class="change" id="btc-change">
-                        <i class="fas fa-arrow-up change-icon"></i>
-                        +—%
-                    </div>
-                    <div class="card-info" id="btc-info">Market cap: — • Volume: —</div>
-                </article>
-
-                <!-- Ethereum -->
-                <article class="card" aria-labelledby="eth-title" tabindex="0">
-                    <div class="card-header">
-                        <div class="icon eth">
-                            <i class="fab fa-ethereum"></i>
-                        </div>
-                        <div>
-                            <div class="card-title" id="eth-title">Ethereum</div>
-                            <div class="card-subtitle">ETH / USD</div>
-                        </div>
-                    </div>
-                    <div class="price" id="eth-price">$—</div>
-                    <div class="change" id="eth-change">
-                        <i class="fas fa-arrow-up change-icon"></i>
-                        +—%
-                    </div>
-                    <div class="card-info" id="eth-info">Market cap: — • Volume: —</div>
-                </article>
-
-                <!-- BTC Dominance -->
-                <article class="card" aria-labelledby="btc-d-title" tabindex="0">
-                    <div class="card-header">
-                        <div class="icon btc-d">D</div>
-                        <div>
-                            <div class="card-title" id="btc-d-title">BTC Dominance</div>
-                            <div class="card-subtitle">Доля рынка</div>
-                        </div>
-                    </div>
-                    <div class="price" id="btc-d-price">—%</div>
-                    <div class="change positive" id="btc-d-change">
-                        <i class="fas fa-arrow-up change-icon"></i>
-                        +—%
-                    </div>
-                    <div class="card-info">Процент от общей капитализации рынка</div>
-                </article>
-
-                <!-- ETH/BTC -->
-                <article class="card" aria-labelledby="eth-btc-title" tabindex="0">
-                    <div class="card-header">
-                        <div class="icon eth-btc">ETH/BTC</div>
-                        <div>
-                            <div class="card-title" id="eth-btc-title">ETH / BTC</div>
-                            <div class="card-subtitle">Кросс-курс</div>
-                        </div>
-                    </div>
-                    <div class="price" id="eth-btc-price">—</div>
-                    <div class="change positive" id="eth-btc-change">
-                        <i class="fas fa-arrow-up change-icon"></i>
-                        +—%
-                    </div>
-                    <div class="card-info">Текущий курс ETH в BTC</div>
-                </article>
-            </div>
-        </section>
-
-        <!-- Валюты -->
-        <section aria-labelledby="fx-title">
-            <h2 class="section-title" id="fx-title">Валюты (к рублю)</h2>
-            <div class="grid">
-                <!-- USD/RUB -->
-                <article class="card" tabindex="0">
-                    <div class="card-header">
-                        <div class="icon usd">$</div>
-                        <div>
-                            <div class="card-title">USD / RUB</div>
-                            <div class="card-subtitle">Доллар к рублю</div>
-                        </div>
-                    </div>
-                    <div class="price" id="usd-rub">—</div>
-                    <div class="change positive" id="usd-rub-change">
-                        <i class="fas fa-arrow-up change-icon"></i>
-                        +—%
-                    </div>
-                    <div class="card-info">Курс обновляется в реальном времени</div>
-                </article>
-
-                <!-- EUR/RUB -->
-                <article class="card" tabindex="0">
-                    <div class="card-header">
-                        <div class="icon eur">€</div>
-                        <div>
-                            <div class="card-title">EUR / RUB</div>
-                            <div class="card-subtitle">Евро к рублю</div>
-                        </div>
-                    </div>
-                    <div class="price" id="eur-rub">—</div>
-                    <div class="change positive" id="eur-rub-change">
-                        <i class="fas fa-arrow-up change-icon"></i>
-                        +—%
-                    </div>
-                    <div class="card-info">Курс обновляется в реальном времени</div>
-                </article>
-
-                <!-- CNY/RUB -->
-                <article class="card" tabindex="0">
-                    <div class="card-header">
-                        <div class="icon cny">¥</div>
-                        <div>
-                            <div class="card-title">CNY / RUB</div>
-                            <div class="card-subtitle">Юань к рублю</div>
-                        </div>
-                    </div>
-                    <div class="price" id="cny-rub">—</div>
-                    <div class="change positive" id="cny-rub-change">
-                        <i class="fas fa-arrow-up change-icon"></i>
-                        +—%
-                    </div>
-                    <div class="card-info">Курс обновляется в реальном времени</div>
-                </article>
-
-                <!-- RUB Base -->
-                <article class="card" tabindex="0">
-                    <div class="card-header">
-                        <div class="icon" style="background: linear-gradient(135deg, #ff9f0a, #ffcc6b)">₽</div>
-                        <div>
-                            <div class="card-title">RUB</div>
-                            <div class="card-subtitle">Базовая валюта</div>
-                        </div>
-                    </div>
-                    <div class="price">RUB</div>
-                    <div class="card-info">Российский рубль как базовая валюта для расчетов</div>
-                </article>
-            </div>
-        </section>
-
-        <!-- Индексы -->
-        <section aria-labelledby="indices-title">
-            <h2 class="section-title" id="indices-title">Индексы</h2>
-            <div class="grid">
-                <!-- MOEX -->
-                <article class="card" tabindex="0">
-                    <div class="card-header">
-                        <div class="icon moex">M</div>
-                        <div>
-                            <div class="card-title">Индекс МосБиржи</div>
-                            <div class="card-subtitle">IMOEX</div>
-                        </div>
-                    </div>
-                    <div class="price" id="moex-value">—</div>
-                    <div class="change positive" id="moex-change">
-                        <i class="fas fa-arrow-up change-icon"></i>
-                        +—%
-                    </div>
-                    <div class="card-info">Российский фондовый рынок</div>
-                </article>
-
-                <!-- S&P 500 -->
-                <article class="card" tabindex="0">
-                    <div class="card-header">
-                        <div class="icon sp500">S&P</div>
-                        <div>
-                            <div class="card-title">S&P 500</div>
-                            <div class="card-subtitle">US Market</div>
-                        </div>
-                    </div>
-                    <div class="price" id="sp500-value">—</div>
-                    <div class="change positive" id="sp500-change">
-                        <i class="fas fa-arrow-up change-icon"></i>
-                        +—%
-                    </div>
-                    <div class="card-info">Американский фондовый рынок</div>
-                </article>
-
-            </div>
-        </section>
-    </main>
-
-    <footer id="status" aria-live="polite">Данные загружаются...</footer>
-
-    <script>
-        // API endpoints нашего бэкенда
-        const API_BASE = window.location.origin;
-        const API_ENDPOINTS = {
-            bitcoin: `${API_BASE}/api/bitcoin`,
-            ethereum: `${API_BASE}/api/ethereum`,
-            btcDominance: `${API_BASE}/api/btc-dominance`,
-            ethBtc: `${API_BASE}/api/eth-btc`,
-            currencies: `${API_BASE}/api/currencies`,
-            indices: `${API_BASE}/api/indices`
-        };
-
-        // Элементы DOM
-        const elements = {
-            // Header
-            lastUpdated: document.getElementById('last-updated'),
-            status: document.getElementById('status'),
-
-            // Bitcoin
-            btcPrice: document.getElementById('btc-price'),
-            btcChange: document.getElementById('btc-change'),
-            btcInfo: document.getElementById('btc-info'),
-
-            // Ethereum
-            ethPrice: document.getElementById('eth-price'),
-            ethChange: document.getElementById('eth-change'),
-            ethInfo: document.getElementById('eth-info'),
-
-            // BTC Dominance
-            btcDPrice: document.getElementById('btc-d-price'),
-            btcDChange: document.getElementById('btc-d-change'),
-
-            // ETH/BTC
-            ethBtcPrice: document.getElementById('eth-btc-price'),
-            ethBtcChange: document.getElementById('eth-btc-change'),
-
-            // Currencies
-            usdRub: document.getElementById('usd-rub'),
-            usdRubChange: document.getElementById('usd-rub-change'),
-            eurRub: document.getElementById('eur-rub'),
-            eurRubChange: document.getElementById('eur-rub-change'),
-            cnyRub: document.getElementById('cny-rub'),
-            cnyRubChange: document.getElementById('cny-rub-change'),
-
-            // Indices
-            moexValue: document.getElementById('moex-value'),
-            moexChange: document.getElementById('moex-change'),
-            sp500Value: document.getElementById('sp500-value'),
-            sp500Change: document.getElementById('sp500-change')
-        };
-
-        // Форматирование чисел
-        function formatPrice(price, decimals = 2) {
-            if (price === null || price === undefined) return '—';
-            return new Intl.NumberFormat('en-US', {
-                minimumFractionDigits: decimals,
-                maximumFractionDigits: decimals
-            }).format(price);
-        }
-
-        function formatChange(change) {
-            if (change === null || change === undefined) return '—%';
-            const sign = change >= 0 ? '+' : '';
-            return `${sign}${change.toFixed(2)}%`;
-        }
-
-        // Обновление отображения
-        function updateDisplay(data) {
-            // Bitcoin
-            if (data.bitcoin) {
-                elements.btcPrice.textContent = `$${formatPrice(data.bitcoin.price)}`;
-                const btcChange = data.bitcoin.change_24h || 0;
+                elements.btcPrice.textContent = `$${formatPrice(btcPrice)}`;
                 elements.btcChange.innerHTML = `<i class="fas fa-arrow-${btcChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(btcChange)}`;
                 elements.btcChange.className = `change ${btcChange >= 0 ? 'positive' : 'negative'}`;
-                elements.btcInfo.textContent = `Market cap: $${formatPrice(data.bitcoin.market_cap, 0)} • Volume: $${formatPrice(data.bitcoin.volume, 0)}`;
+                elements.btcInfo.textContent = `Market cap: $${formatPrice(btcMarketCap, 0)} • Volume: $${formatPrice(btcVolume, 0)}`;
             }
 
-            // Ethereum
-            if (data.ethereum) {
-                elements.ethPrice.textContent = `$${formatPrice(data.ethereum.price)}`;
-                const ethChange = data.ethereum.change_24h || 0;
+            // Обработка Ethereum
+            if (ethResponse.status === 'fulfilled' && ethResponse.value.ok) {
+                ethData = await ethResponse.value.json();
+                const ethPrice = ethData.market_data?.current_price?.usd;
+                const ethChange = ethData.market_data?.price_change_percentage_24h;
+                const ethMarketCap = ethData.market_data?.market_cap?.usd;
+                const ethVolume = ethData.market_data?.total_volume?.usd;
+
+                elements.ethPrice.textContent = `$${formatPrice(ethPrice)}`;
                 elements.ethChange.innerHTML = `<i class="fas fa-arrow-${ethChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(ethChange)}`;
                 elements.ethChange.className = `change ${ethChange >= 0 ? 'positive' : 'negative'}`;
-                elements.ethInfo.textContent = `Market cap: $${formatPrice(data.ethereum.market_cap, 0)} • Volume: $${formatPrice(data.ethereum.volume, 0)}`;
+                elements.ethInfo.textContent = `Market cap: $${formatPrice(ethMarketCap, 0)} • Volume: $${formatPrice(ethVolume, 0)}`;
+
+                // Расчет ETH/BTC
+                if (btcData && btcData.market_data?.current_price?.usd && ethPrice) {
+                    const ethBtcRatio = ethPrice / btcData.market_data.current_price.usd;
+                    elements.ethBtcPrice.textContent = formatPrice(ethBtcRatio, 6);
+                }
             }
 
-            // BTC Dominance
-            if (data.dominance) {
-                elements.btcDPrice.textContent = `${formatPrice(data.dominance.btc_dominance, 1)}%`;
-                elements.btcDChange.innerHTML = `<i class="fas fa-arrow-up change-icon"></i>${formatChange(0.15)}`;
+            // Обработка BTC Dominance
+            if (dominanceResponse.status === 'fulfilled' && dominanceResponse.value.ok) {
+                dominanceData = await dominanceResponse.value.json();
+                const btcDominance = dominanceData.data?.market_cap_percentage?.btc;
+                elements.btcDPrice.textContent = `${formatPrice(btcDominance, 1)}%`;
             }
 
-            // ETH/BTC
-            if (data.ethBtc) {
-                elements.ethBtcPrice.textContent = formatPrice(data.ethBtc.eth_btc, 4);
-                elements.ethBtcChange.innerHTML = `<i class="fas fa-arrow-up change-icon"></i>${formatChange(0.25)}`;
+            // Обработка валют
+            if (fxResponse.status === 'fulfilled' && fxResponse.value.ok) {
+                fxData = await fxResponse.value.json();
+                const rubRate = fxData.rates?.RUB;
+                const eurRate = fxData.rates?.EUR;
+                const cnyRate = fxData.rates?.CNY;
+
+                if (rubRate) {
+                    elements.usdRub.textContent = formatPrice(rubRate, 2);
+                    if (eurRate) elements.eurRub.textContent = formatPrice(rubRate / eurRate, 2);
+                    if (cnyRate) elements.cnyRub.textContent = formatPrice(rubRate / cnyRate, 2);
+                }
             }
 
-            // Currencies
-            if (data.currencies && data.currencies.rates) {
-                const rub = data.currencies.rates.RUB;
-                const eur = data.currencies.rates.EUR;
-                const cny = data.currencies.rates.CNY;
+            // Индексы (демо-данные с небольшими изменениями)
+            const moexValue = 3200 + Math.random() * 100;
+            const sp500Value = 4800 + Math.random() * 100;
+            elements.moexValue.textContent = formatPrice(moexValue, 0);
+            elements.sp500Value.textContent = formatPrice(sp500Value, 0);
 
-                elements.usdRub.textContent = formatPrice(rub, 2);
-                elements.eurRub.textContent = formatPrice(rub / eur, 2);
-                elements.cnyRub.textContent = formatPrice(rub / cny, 2);
-            }
-
-            // Indices
-            if (data.indices) {
-                elements.moexValue.textContent = formatPrice(data.indices.moex, 0);
-                elements.sp500Value.textContent = formatPrice(data.indices.sp500, 0);
-            }
-
-            // Время обновления
+            // Обновление времени
             const now = new Date();
             elements.lastUpdated.textContent = `Обновлено: ${now.toLocaleTimeString('ru-RU')}`;
+            elements.status.textContent = 'Данные загружены';
+
+        } catch (error) {
+            console.error('Ошибка загрузки:', error);
+            elements.status.textContent = 'Ошибка загрузки. Используются демо-данные.';
+            useDemoData();
         }
+    }
 
-        // Загрузка данных
-        async function fetchMarketData() {
-            try {
-                elements.status.textContent = 'Обновление данных...';
+    // Демо-данные при ошибке
+    function useDemoData() {
+        const btcPrice = 42000 + Math.random() * 5000;
+        const ethPrice = 2500 + Math.random() * 500;
+        const btcChange = (Math.random() - 0.5) * 10;
+        const ethChange = (Math.random() - 0.5) * 8;
 
-                const responses = await Promise.allSettled([
-                    fetch(API_ENDPOINTS.bitcoin),
-                    fetch(API_ENDPOINTS.ethereum),
-                    fetch(API_ENDPOINTS.btcDominance),
-                    fetch(API_ENDPOINTS.ethBtc),
-                    fetch(API_ENDPOINTS.currencies),
-                    fetch(API_ENDPOINTS.indices)
-                ]);
+        elements.btcPrice.textContent = `$${formatPrice(btcPrice)}`;
+        elements.btcChange.innerHTML = `<i class="fas fa-arrow-${btcChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(btcChange)}`;
+        elements.btcChange.className = `change ${btcChange >= 0 ? 'positive' : 'negative'}`;
+        
+        elements.ethPrice.textContent = `$${formatPrice(ethPrice)}`;
+        elements.ethChange.innerHTML = `<i class="fas fa-arrow-${ethChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(ethChange)}`;
+        elements.ethChange.className = `change ${ethChange >= 0 ? 'positive' : 'negative'}`;
+        
+        elements.btcDPrice.textContent = `${formatPrice(50 + Math.random() * 5, 1)}%`;
+        elements.ethBtcPrice.textContent = formatPrice(ethPrice / btcPrice, 6);
+        elements.usdRub.textContent = formatPrice(90 + Math.random() * 5, 2);
+        elements.eurRub.textContent = formatPrice(100 + Math.random() * 5, 2);
+        elements.cnyRub.textContent = formatPrice(12 + Math.random(), 2);
+        elements.moexValue.textContent = formatPrice(3200 + Math.random() * 100, 0);
+        elements.sp500Value.textContent = formatPrice(4800 + Math.random() * 100, 0);
+    }
 
-                const data = {};
+    // Автообновление
+    function startAutoRefresh() {
+        setInterval(fetchMarketData, 30000);
+    }
 
-                responses.forEach((response, index) => {
-                    const endpoints = Object.keys(API_ENDPOINTS);
-                    const endpoint = endpoints[index];
-                    
-                    if (response.status === 'fulfilled' && response.value.ok) {
-                        response.value.json().then(result => {
-                            if (result.success) {
-                                const key = endpoint.replace('api/', '')
-                                    .replace('btc-dominance', 'dominance')
-                                    .replace('eth-btc', 'ethBtc');
-                                data[key] = result.data;
-                            }
-                        });
-                    }
-                });
+    // Инициализация
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchMarketData();
+        startAutoRefresh();
+    });
 
-                // Ждем немного для обработки всех промисов
-                setTimeout(() => {
-                    updateDisplay(data);
-                    elements.status.textContent = `Данные обновлены: ${new Date().toLocaleTimeString('ru-RU')}`;
-                }, 100);
-
-            } catch (error) {
-                console.error('Ошибка загрузки:', error);
-                elements.status.textContent = 'Ошибка загрузки. Используются демо-данные.';
-                useDemoData();
-            }
-        }
-
-        // Демо-данные
-        function useDemoData() {
-            const demoData = {
-                bitcoin: {
-                    price: 112051,
-                    change_24h: 0.26,
-                    market_cap: 2236379345199,
-                    volume: 78303134204
-                },
-                ethereum: {
-                    price: 4070,
-                    change_24h: 2.74,
-                    market_cap: 488000000000,
-                    volume: 15000000000
-                },
-                dominance: {
-                    btc_dominance: 57.0
-                },
-                ethBtc: {
-                    eth_btc: 0.0364
-                },
-                currencies: {
-                    rates: {
-                        RUB: 91.45,
-                        EUR: 0.92,
-                        CNY: 7.25
-                    }
-                },
-                indices: {
-                    moex: 3247,
-                    sp500: 4785
-                }
-            };
-            updateDisplay(demoData);
-        }
-
-        // Автообновление
-        function startAutoRefresh() {
-            setInterval(fetchMarketData, 30000);
-        }
-
-        // Инициализация
-        document.addEventListener('DOMContentLoaded', function() {
+    // Горячие клавиши
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+            e.preventDefault();
             fetchMarketData();
-            startAutoRefresh();
-        });
-
-        // Горячие клавиши
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
-                e.preventDefault();
-                fetchMarketData();
-            }
-        });
-    </script>
-</body>
-</html>
+        }
+    });
+</script>
