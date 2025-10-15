@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 вот код обнови
 <!DOCTYPE html>
 <html lang="ru">
@@ -502,20 +503,100 @@
                 const btcData = await btcResponse.json();
                 const btcPrice = btcData.bitcoin?.usd;
                 const btcChange = btcData.bitcoin?.usd_24h_change;
+=======
+<script>
+    // Прямые API endpoints (работают без бэкенда)
+    const API_ENDPOINTS = {
+        bitcoin: 'https://api.coingecko.com/api/v3/coins/bitcoin',
+        ethereum: 'https://api.coingecko.com/api/v3/coins/ethereum',
+        dominance: 'https://api.coingecko.com/api/v3/global',
+        currencies: 'https://api.frankfurter.app/latest?from=USD'
+    };
+
+    // Элементы DOM
+    const elements = {
+        lastUpdated: document.getElementById('last-updated'),
+        status: document.getElementById('status'),
+        btcPrice: document.getElementById('btc-price'),
+        btcChange: document.getElementById('btc-change'),
+        btcInfo: document.getElementById('btc-info'),
+        ethPrice: document.getElementById('eth-price'),
+        ethChange: document.getElementById('eth-change'),
+        ethInfo: document.getElementById('eth-info'),
+        btcDPrice: document.getElementById('btc-d-price'),
+        ethBtcPrice: document.getElementById('eth-btc-price'),
+        usdRub: document.getElementById('usd-rub'),
+        eurRub: document.getElementById('eur-rub'),
+        cnyRub: document.getElementById('cny-rub'),
+        moexValue: document.getElementById('moex-value'),
+        sp500Value: document.getElementById('sp500-value')
+    };
+
+    // Форматирование чисел
+    function formatPrice(price, decimals = 2) {
+        if (price === null || price === undefined || isNaN(price)) return '—';
+        return new Intl.NumberFormat('en-US', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        }).format(price);
+    }
+
+    function formatChange(change) {
+        if (change === null || change === undefined || isNaN(change)) return '—%';
+        const sign = change >= 0 ? '+' : '';
+        return `${sign}${Math.abs(change).toFixed(2)}%`;
+    }
+
+    // Загрузка данных с прямых API
+    async function fetchMarketData() {
+        try {
+            elements.status.textContent = 'Обновление данных...';
+            
+            const [btcResponse, ethResponse, dominanceResponse, fxResponse] = await Promise.allSettled([
+                fetch(API_ENDPOINTS.bitcoin),
+                fetch(API_ENDPOINTS.ethereum),
+                fetch(API_ENDPOINTS.dominance),
+                fetch(API_ENDPOINTS.currencies)
+            ]);
+
+            let btcData, ethData, dominanceData, fxData;
+
+            // Обработка Bitcoin
+            if (btcResponse.status === 'fulfilled' && btcResponse.value.ok) {
+                btcData = await btcResponse.value.json();
+                const btcPrice = btcData.market_data?.current_price?.usd;
+                const btcChange = btcData.market_data?.price_change_percentage_24h;
+                const btcMarketCap = btcData.market_data?.market_cap?.usd;
+                const btcVolume = btcData.market_data?.total_volume?.usd;
+>>>>>>> 990dd24be42bbfd2b8ed5809aa6b7130e098959c
 
                 elements.btcPrice.textContent = `$${formatPrice(btcPrice)}`;
                 elements.btcChange.innerHTML = `<i class="fas fa-arrow-${btcChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(btcChange)}`;
                 elements.btcChange.className = `change ${btcChange >= 0 ? 'positive' : 'negative'}`;
+<<<<<<< HEAD
 
                 // Ethereum
                 const ethResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd&include_24hr_change=true');
                 const ethData = await ethResponse.json();
                 const ethPrice = ethData.ethereum?.usd;
                 const ethChange = ethData.ethereum?.usd_24h_change;
+=======
+                elements.btcInfo.textContent = `Market cap: $${formatPrice(btcMarketCap, 0)} • Volume: $${formatPrice(btcVolume, 0)}`;
+            }
+
+            // Обработка Ethereum
+            if (ethResponse.status === 'fulfilled' && ethResponse.value.ok) {
+                ethData = await ethResponse.value.json();
+                const ethPrice = ethData.market_data?.current_price?.usd;
+                const ethChange = ethData.market_data?.price_change_percentage_24h;
+                const ethMarketCap = ethData.market_data?.market_cap?.usd;
+                const ethVolume = ethData.market_data?.total_volume?.usd;
+>>>>>>> 990dd24be42bbfd2b8ed5809aa6b7130e098959c
 
                 elements.ethPrice.textContent = `$${formatPrice(ethPrice)}`;
                 elements.ethChange.innerHTML = `<i class="fas fa-arrow-${ethChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(ethChange)}`;
                 elements.ethChange.className = `change ${ethChange >= 0 ? 'positive' : 'negative'}`;
+<<<<<<< HEAD
 
                 // ETH/BTC
                 if (btcPrice && ethPrice) {
@@ -583,3 +664,96 @@
 </script>
 </body>
 </html>
+=======
+                elements.ethInfo.textContent = `Market cap: $${formatPrice(ethMarketCap, 0)} • Volume: $${formatPrice(ethVolume, 0)}`;
+
+                // Расчет ETH/BTC
+                if (btcData && btcData.market_data?.current_price?.usd && ethPrice) {
+                    const ethBtcRatio = ethPrice / btcData.market_data.current_price.usd;
+                    elements.ethBtcPrice.textContent = formatPrice(ethBtcRatio, 6);
+                }
+            }
+
+            // Обработка BTC Dominance
+            if (dominanceResponse.status === 'fulfilled' && dominanceResponse.value.ok) {
+                dominanceData = await dominanceResponse.value.json();
+                const btcDominance = dominanceData.data?.market_cap_percentage?.btc;
+                elements.btcDPrice.textContent = `${formatPrice(btcDominance, 1)}%`;
+            }
+
+            // Обработка валют
+            if (fxResponse.status === 'fulfilled' && fxResponse.value.ok) {
+                fxData = await fxResponse.value.json();
+                const rubRate = fxData.rates?.RUB;
+                const eurRate = fxData.rates?.EUR;
+                const cnyRate = fxData.rates?.CNY;
+
+                if (rubRate) {
+                    elements.usdRub.textContent = formatPrice(rubRate, 2);
+                    if (eurRate) elements.eurRub.textContent = formatPrice(rubRate / eurRate, 2);
+                    if (cnyRate) elements.cnyRub.textContent = formatPrice(rubRate / cnyRate, 2);
+                }
+            }
+
+            // Индексы (демо-данные с небольшими изменениями)
+            const moexValue = 3200 + Math.random() * 100;
+            const sp500Value = 4800 + Math.random() * 100;
+            elements.moexValue.textContent = formatPrice(moexValue, 0);
+            elements.sp500Value.textContent = formatPrice(sp500Value, 0);
+
+            // Обновление времени
+            const now = new Date();
+            elements.lastUpdated.textContent = `Обновлено: ${now.toLocaleTimeString('ru-RU')}`;
+            elements.status.textContent = 'Данные загружены';
+
+        } catch (error) {
+            console.error('Ошибка загрузки:', error);
+            elements.status.textContent = 'Ошибка загрузки. Используются демо-данные.';
+            useDemoData();
+        }
+    }
+
+    // Демо-данные при ошибке
+    function useDemoData() {
+        const btcPrice = 42000 + Math.random() * 5000;
+        const ethPrice = 2500 + Math.random() * 500;
+        const btcChange = (Math.random() - 0.5) * 10;
+        const ethChange = (Math.random() - 0.5) * 8;
+
+        elements.btcPrice.textContent = `$${formatPrice(btcPrice)}`;
+        elements.btcChange.innerHTML = `<i class="fas fa-arrow-${btcChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(btcChange)}`;
+        elements.btcChange.className = `change ${btcChange >= 0 ? 'positive' : 'negative'}`;
+        
+        elements.ethPrice.textContent = `$${formatPrice(ethPrice)}`;
+        elements.ethChange.innerHTML = `<i class="fas fa-arrow-${ethChange >= 0 ? 'up' : 'down'} change-icon"></i>${formatChange(ethChange)}`;
+        elements.ethChange.className = `change ${ethChange >= 0 ? 'positive' : 'negative'}`;
+        
+        elements.btcDPrice.textContent = `${formatPrice(50 + Math.random() * 5, 1)}%`;
+        elements.ethBtcPrice.textContent = formatPrice(ethPrice / btcPrice, 6);
+        elements.usdRub.textContent = formatPrice(90 + Math.random() * 5, 2);
+        elements.eurRub.textContent = formatPrice(100 + Math.random() * 5, 2);
+        elements.cnyRub.textContent = formatPrice(12 + Math.random(), 2);
+        elements.moexValue.textContent = formatPrice(3200 + Math.random() * 100, 0);
+        elements.sp500Value.textContent = formatPrice(4800 + Math.random() * 100, 0);
+    }
+
+    // Автообновление
+    function startAutoRefresh() {
+        setInterval(fetchMarketData, 30000);
+    }
+
+    // Инициализация
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchMarketData();
+        startAutoRefresh();
+    });
+
+    // Горячие клавиши
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+            e.preventDefault();
+            fetchMarketData();
+        }
+    });
+</script>
+>>>>>>> 990dd24be42bbfd2b8ed5809aa6b7130e098959c
